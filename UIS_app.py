@@ -1,7 +1,7 @@
 import streamlit as st
 st.set_page_config(page_title="Analysis App", layout="wide")  # Must be the very first Streamlit command
 
-pip install plotly
+
 import pandas as pd
 import plotly.express as px
 
