@@ -103,7 +103,7 @@ def create_line_chart_with_selection(country_code):
         "Select Indicator(s) to Display",
         options=indicator_options,
         format_func=format_indicator,
-        default=indicator_options  # default to all if you wish; otherwise, set to [] for none
+        default=[]  # default to all if you wish; otherwise, set to [] for none
     )
     
     if not selected_indicators:
