@@ -4,6 +4,9 @@ st.set_page_config(page_title="Analysis App", layout="wide")  # Must be the very
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from nepal_trafficking_scraper import NepalTraffickingScraper
+import os
 
 # =============================================================================
 # CUSTOM CSS FOR THEME
@@ -70,7 +73,8 @@ PARENTS = {
     "Sierra Leone": "individual",
     "USA": "individual",
     "individual": "home",
-    "cross": "home"
+    "cross": "home",
+    "trafficking": "home"
 }
 
 def show_back_button():
@@ -146,13 +150,16 @@ def create_line_chart_with_selection(country_code):
 def show_home():
     """Home page with large buttons to select analysis type."""
     st.title("Home")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Individual Analysis", use_container_width=True):
             st.session_state.page = "individual"
     with col2:
         if st.button("Cross-country Analysis", use_container_width=True):
             st.session_state.page = "cross"
+    with col3:
+        if st.button("Nepal Human Trafficking Data", use_container_width=True):
+            st.session_state.page = "trafficking"
 
 def show_individual():
     """Individual Analysis page with buttons for each country."""
@@ -313,6 +320,162 @@ def show_usa():
         st.plotly_chart(fig, use_container_width=True)
 
 # =============================================================================
+# NEPAL HUMAN TRAFFICKING DATA PAGE
+# =============================================================================
+def show_trafficking():
+    """Nepal Human Trafficking Data page with scraper functionality."""
+    st.title("Nepal Human Trafficking Data Scraper")
+    
+    st.markdown("""
+    This page allows you to scrape human trafficking data related to Nepal from various reliable sources
+    and export the data to spreadsheet format.
+    """)
+    
+    # Create columns for layout
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("Data Sources")
+        st.markdown("""
+        The scraper collects data from the following sources:
+        - **UN Office on Drugs and Crime (UNODC)** - Global reports on trafficking in persons
+        - **US State Department** - Trafficking in Persons (TIP) Report
+        - **International Labour Organization (ILO)** - Forced labor and child labor statistics
+        - **Nepal Police** - Local law enforcement data
+        - **Ministry of Women, Children and Senior Citizens** - Government victim protection data
+        - **National Human Rights Commission Nepal** - Human rights violations reports
+        - **NGOs** - Maiti Nepal, Shakti Samuha, and other organizations working on trafficking issues
+        """)
+    
+    with col2:
+        st.subheader("Actions")
+        
+        # Initialize scraper in session state
+        if 'scraper' not in st.session_state:
+            st.session_state.scraper = NepalTraffickingScraper()
+            st.session_state.scraped_data = None
+        
+        # Scrape data button
+        if st.button("🔍 Scrape Latest Data", use_container_width=True):
+            with st.spinner("Scraping data from multiple sources..."):
+                try:
+                    data = st.session_state.scraper.scrape_all_sources()
+                    st.session_state.scraped_data = data
+                    st.success(f"Successfully scraped {len(data)} data points!")
+                except Exception as e:
+                    st.error(f"Error scraping data: {str(e)}")
+        
+        # Export buttons
+        if st.session_state.scraped_data:
+            st.subheader("Export Data")
+            
+            col_excel, col_csv = st.columns(2)
+            
+            with col_excel:
+                if st.button("📊 Export to Excel", use_container_width=True):
+                    with st.spinner("Creating Excel file..."):
+                        try:
+                            excel_file = st.session_state.scraper.save_to_excel()
+                            if excel_file and os.path.exists(excel_file):
+                                with open(excel_file, 'rb') as f:
+                                    st.download_button(
+                                        label="Download Excel File",
+                                        data=f.read(),
+                                        file_name="nepal_trafficking_data.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True
+                                    )
+                                st.success("Excel file ready for download!")
+                        except Exception as e:
+                            st.error(f"Error creating Excel file: {str(e)}")
+            
+            with col_csv:
+                if st.button("📄 Export to CSV", use_container_width=True):
+                    with st.spinner("Creating CSV file..."):
+                        try:
+                            csv_file = st.session_state.scraper.save_to_csv()
+                            if csv_file and os.path.exists(csv_file):
+                                with open(csv_file, 'r') as f:
+                                    st.download_button(
+                                        label="Download CSV File",
+                                        data=f.read(),
+                                        file_name="nepal_trafficking_data.csv",
+                                        mime="text/csv",
+                                        use_container_width=True
+                                    )
+                                st.success("CSV file ready for download!")
+                        except Exception as e:
+                            st.error(f"Error creating CSV file: {str(e)}")
+    
+    # Display scraped data
+    if st.session_state.scraped_data:
+        st.subheader("Scraped Data Preview")
+        
+        # Create DataFrame for display
+        df = pd.DataFrame(st.session_state.scraped_data)
+        
+        # Show summary statistics
+        summary = st.session_state.scraper.get_summary_stats()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Records", summary.get('total_records', 0))
+        with col2:
+            st.metric("Data Sources", summary.get('sources', 0))
+        with col3:
+            st.metric("Years Covered", summary.get('years_covered', 0))
+        with col4:
+            st.metric("Categories", summary.get('categories', 0))
+        
+        # Show data table
+        st.dataframe(df, use_container_width=True)
+        
+        # Create visualizations
+        if 'source' in df.columns:
+            st.subheader("Data Visualization")
+            
+            # Chart by source
+            source_counts = df['source'].value_counts()
+            fig_source = px.bar(
+                x=source_counts.index, 
+                y=source_counts.values,
+                title="Number of Data Points by Source",
+                labels={'x': 'Source', 'y': 'Number of Records'}
+            )
+            fig_source.update_layout(
+                xaxis_tickangle=-45,
+                height=400
+            )
+            st.plotly_chart(fig_source, use_container_width=True)
+            
+            # Chart by category if available
+            if 'category' in df.columns:
+                category_counts = df['category'].value_counts()
+                fig_category = px.pie(
+                    values=category_counts.values,
+                    names=category_counts.index,
+                    title="Distribution by Category"
+                )
+                st.plotly_chart(fig_category, use_container_width=True)
+            
+            # Timeline chart if year data is available
+            if 'year' in df.columns and 'value' in df.columns:
+                # Filter numeric values for timeline
+                numeric_df = df[pd.to_numeric(df['value'], errors='coerce').notna()].copy()
+                numeric_df['value'] = pd.to_numeric(numeric_df['value'])
+                
+                if not numeric_df.empty:
+                    fig_timeline = px.line(
+                        numeric_df,
+                        x='year',
+                        y='value',
+                        color='indicator',
+                        title="Timeline of Key Indicators",
+                        labels={'value': 'Value', 'year': 'Year'}
+                    )
+                    st.plotly_chart(fig_timeline, use_container_width=True)
+
+# =============================================================================
 # MAIN APP FUNCTION
 # =============================================================================
 def main():
@@ -326,6 +489,8 @@ def main():
         show_individual()
     elif st.session_state.page == "cross":
         show_cross()
+    elif st.session_state.page == "trafficking":
+        show_trafficking()
     elif st.session_state.page == "Nepal":
         show_nepal()
     elif st.session_state.page == "Estonia":
