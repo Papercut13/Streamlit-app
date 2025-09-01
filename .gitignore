@@ -1,0 +1,20 @@
+# Generated data files
+nepal_trafficking_data.csv
+nepal_trafficking_data.xlsx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
